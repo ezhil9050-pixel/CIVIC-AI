@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>CivicAI — Smart Public Issue Resolution</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+*{box-sizing:border-box}
+:root{
+ --bg:#f4f7fb;--panel:#fff;--sidebar:#0b1730;--sidebar2:#101f3d;
+ --text:#16243b;--muted:#6b7b91;--line:#e4eaf2;
+ --accent:#176b87;--accent2:#22a0a8;--soft:#e8f5f7;
+ --success:#21865a;--warning:#b87814;--danger:#c94d55;
+ --shadow:0 12px 35px rgba(21,43,72,.08)
+}
+body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
+button,input,textarea,select{font:inherit}
+button{cursor:pointer}
+.hidden{display:none!important}
+
+/* Login */
+.auth{min-height:100vh;display:grid;place-items:center;padding:24px;background:
+ radial-gradient(circle at 10% 10%,#dff4f5 0,transparent 30%),
+ radial-gradient(circle at 90% 90%,#dce9fb 0,transparent 32%),#f4f7fb}
+.auth-card{width:min(900px,100%);background:#fff;border:1px solid var(--line);border-radius:28px;box-shadow:0 25px 70px rgba(24,50,83,.13);padding:34px}
+.brand-row{display:flex;align-items:center;gap:12px;margin-bottom:24px}
+.logo{width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:grid;place-items:center;color:#fff;font-weight:900;font-size:20px}
+.brand{font-size:26px;font-weight:900;letter-spacing:-.6px}.brand span{color:var(--accent2)}
+.auth h1{font-size:34px;margin:0 0 8px}.auth-sub{color:var(--muted);margin:0 0 24px}
+.roles{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:20px 0}
+.role-card{border:1.5px solid var(--line);background:#fbfcfe;border-radius:18px;padding:18px;text-align:left;transition:.2s}
+.role-card:hover{border-color:#9acbd1;transform:translateY(-2px)}
+.role-card.active{border-color:var(--accent2);background:var(--soft);box-shadow:0 0 0 3px rgba(34,160,168,.1)}
+.role-icon{font-size:27px}.role-title{font-weight:800;margin-top:8px}.role-desc{font-size:12px;color:var(--muted);margin-top:4px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field{display:grid;gap:6px}.field label{font-size:12px;font-weight:800;color:#52647c}
+.field input,.field textarea,.field select{width:100%;border:1px solid var(--line);border-radius:12px;padding:12px 13px;outline:none;background:#fff;color:var(--text)}
+.field input:focus,.field textarea:focus,.field select:focus{border-color:var(--accent2);box-shadow:0 0 0 3px rgba(34,160,168,.1)}
+.primary{border:0;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border-radius:12px;padding:11px 16px;font-weight:800}
+.secondary{border:1px solid var(--line);background:#fff;color:var(--text);border-radius:12px;padding:10px 14px;font-weight:750}
+.auth-actions{display:flex;justify-content:flex-end;margin-top:16px}.hint{min-height:20px;color:var(--danger);font-size:12px;margin-top:10px}
+
+/* App */
+.app{min-height:100vh}.sidebar{position:fixed;left:0;top:0;bottom:0;width:250px;background:linear-gradient(180deg,var(--sidebar),var(--sidebar2));color:#fff;padding:22px 15px;z-index:20}
+.side-brand{display:flex;align-items:center;gap:10px;padding:0 10px 24px}.side-logo{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,var(--accent2),#70d0d1);display:grid;place-items:center;color:#08243a;font-weight:900}
+.side-name{font-weight:900;font-size:20px}.side-name span{color:#71d6d5}
+.side-label{font-size:10px;letter-spacing:1.6px;color:#8194b1;margin:14px 10px 8px}
+.nav{display:grid;gap:6px}.nav button{border:0;background:transparent;color:#b7c4d8;text-align:left;padding:12px 13px;border-radius:12px;font-weight:700;display:flex;align-items:center;gap:10px}
+.nav button:hover{background:rgba(255,255,255,.07);color:#fff}.nav button.active{background:linear-gradient(90deg,rgba(34,160,168,.25),rgba(34,160,168,.08));color:#fff;box-shadow:inset 3px 0 var(--accent2)}
+.profile{position:absolute;left:15px;right:15px;bottom:15px;border-top:1px solid rgba(255,255,255,.1);padding:16px 8px 4px;display:flex;gap:10px;align-items:center}.avatar{width:38px;height:38px;border-radius:11px;background:#1e3961;display:grid;place-items:center}.profile-name{font-weight:800;font-size:13px}.profile-role{font-size:11px;color:#8fa2bd}
+
+.main{margin-left:250px;min-height:100vh}.topbar{height:76px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 30px;position:sticky;top:0;z-index:10}
+.top-title{font-size:18px;font-weight:900}.crumb{font-size:11px;color:var(--muted);margin-top:3px}.top-actions{display:flex;align-items:center;gap:10px}.search{border:1px solid var(--line);border-radius:12px;padding:10px 13px;width:230px}.icon-btn{width:40px;height:40px;border:1px solid var(--line);background:#fff;border-radius:12px}.logout{border:1px solid #cdd8e5;background:#fff;padding:10px 14px;border-radius:12px;font-weight:800}
+.content{padding:28px;max-width:1500px;margin:auto}.welcome{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px}.welcome h1{margin:0;font-size:30px;letter-spacing:-.7px}.welcome p{margin:6px 0 0;color:var(--muted)}.date{font-size:12px;color:var(--muted)}
+.role-banner{background:linear-gradient(135deg,#e7f6f7,#eef5ff);border:1px solid #cde8eb;padding:13px 16px;border-radius:14px;margin-bottom:20px;color:#25516a;font-size:13px;font-weight:700}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:15px;margin-bottom:18px}.stat{background:#fff;border:1px solid var(--line);border-radius:18px;padding:18px;box-shadow:var(--shadow)}.stat-head{font-size:10px;color:var(--muted);font-weight:900;letter-spacing:.8px;display:flex;justify-content:space-between}.num{font-size:29px;font-weight:900;margin:8px 0 2px}.trend{font-size:11px;color:var(--success);font-weight:750}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:20px;box-shadow:var(--shadow)}.card h2{margin:0 0 7px;font-size:17px}.muted{color:var(--muted);font-size:12px}.row{display:flex;justify-content:space-between;align-items:center;gap:12px}.issue{padding:13px 0;border-bottom:1px solid #edf1f5;display:flex;justify-content:space-between;gap:12px;align-items:center}.issue:last-child{border-bottom:0}.badge{display:inline-flex;align-items:center;border-radius:999px;padding:5px 9px;font-size:10px;font-weight:900;white-space:nowrap}.high{background:#fde7e8;color:#b52f3c}.med{background:#fff1d8;color:#9a6500}.low{background:#def5e9;color:#176b48}.blue{background:#e3f1f7;color:#1b627b}.warning{background:#fff1d8;color:#9a6500}
+.progress{height:8px;background:#e9eef4;border-radius:99px;overflow:hidden;margin:10px 0}.bar{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:99px}
+.actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:13px}.notice{margin-top:12px;padding:11px 13px;border-radius:12px;background:#eef8f8;border:1px solid #d7eeee;font-size:12px;color:#285a67}.danger-notice{background:#fff0f1;border-color:#f2d1d4;color:#963943}
+.tablewrap{overflow:auto}.table{width:100%;border-collapse:collapse;min-width:760px}.table th{text-align:left;font-size:10px;color:#728198;letter-spacing:.6px;padding:12px;border-bottom:1px solid var(--line)}.table td{padding:14px 12px;border-bottom:1px solid #edf1f5;font-size:12px}.table tr:hover{background:#fafcfe}
+#mapCanvas,#mapLive{height:500px;width:100%;border-radius:16px;overflow:hidden;border:1px solid var(--line);z-index:1}.map-tools{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:12px}
+.form-stack{display:grid;gap:13px}.textarea{min-height:105px;resize:vertical}.upload{border:1px dashed #b9c9d9;padding:18px;border-radius:14px;background:#fafcfe}
+.review-stars button{border:0;background:transparent;font-size:24px;padding:0 2px;color:#c9d2dc}.review-stars button.selected{color:#e0a22c}
+.timeline{display:grid;gap:13px}.tl{display:flex;gap:12px}.tl-dot{width:10px;height:10px;border-radius:50%;background:var(--accent2);margin-top:4px;box-shadow:0 0 0 4px #e2f4f5}.tl b{font-size:12px}.tl small{display:block;color:var(--muted);margin-top:2px}
+.account-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:14px}.account-box{padding:14px;border:1px solid var(--line);border-radius:14px;background:#fbfcfe}.account-box b{display:block;font-size:11px;color:var(--muted);margin-bottom:5px}.account-box span{font-weight:850;font-size:13px}
+.empty{padding:35px;text-align:center;color:var(--muted);border:1px dashed #cbd6e2;border-radius:15px}
+.footer-space{height:10px}
+@media(max-width:1050px){.sidebar{width:210px}.main{margin-left:210px}.stats{grid-template-columns:repeat(2,1fr)}.account-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:760px){.sidebar{position:relative;width:100%;height:auto}.profile{position:static;margin-top:12px}.main{margin-left:0}.topbar{position:relative}.content{padding:18px}.grid,.grid3,.form-grid{grid-template-columns:1fr}.roles{grid-template-columns:1fr}.search{display:none}.stats{grid-template-columns:1fr 1fr}}
+@media(max-width:480px){.stats{grid-template-columns:1fr}.account-grid{grid-template-columns:1fr}.auth-card{padding:22px}.welcome{display:block}.date{margin-top:8px}}
+</style>
+
+<style id="theme-only-override">
+:root{
+ --bg:#f5f3ff!important;
+ --panel:#ffffff!important;
+ --sidebar:#17112f!important;
+ --sidebar2:#25164a!important;
+ --text:#21183b!important;
+ --muted:#746b8d!important;
+ --line:#e7e0f4!important;
+ --accent:#6d3df5!important;
+ --accent2:#a855f7!important;
+ --soft:#f0e9ff!important;
+ --success:#18845c!important;
+ --warning:#b97814!important;
+ --danger:#c74657!important;
+ --shadow:0 12px 35px rgba(70,40,130,.10)!important;
+}
+body{
+ background:
+  radial-gradient(circle at 8% 8%,rgba(168,85,247,.12),transparent 28%),
+  radial-gradient(circle at 92% 90%,rgba(109,61,245,.10),transparent 30%),
+  var(--bg)!important;
+ color:var(--text)!important;
+}
+.primary{
+ background:linear-gradient(135deg,#6d3df5,#a855f7)!important;
+ color:#fff!important;
+ border:0!important;
+ box-shadow:0 8px 18px rgba(109,61,245,.22)!important;
+ transition:transform .18s ease,box-shadow .18s ease,filter .18s ease!important;
+}
+.primary:hover{
+ transform:translateY(-2px) scale(1.025)!important;
+ box-shadow:0 12px 25px rgba(109,61,245,.32)!important;
+ filter:brightness(1.05)!important;
+}
+.primary:active{transform:translateY(0) scale(.985)!important}
+.secondary,.logout,.icon-btn{
+ transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease!important;
+}
+.secondary:hover,.logout:hover,.icon-btn:hover{
+ transform:translateY(-2px)!important;
+ border-color:#a855f7!important;
+ box-shadow:0 8px 18px rgba(109,61,245,.14)!important;
+}
+button:not(.role-card):not(.nav button):hover{transform:translateY(-2px)}
+button:not(.role-card):not(.nav button):active{transform:translateY(0) scale(.98)}
+.role-card:hover{border-color:#a855f7!important;box-shadow:0 8px 20px rgba(109,61,245,.10)!important}
+.role-card.active{border-color:#a855f7!important;background:#f1eaff!important;box-shadow:0 0 0 3px rgba(168,85,247,.12)!important}
+.logo,.side-logo{background:linear-gradient(135deg,#6d3df5,#a855f7)!important}
+.nav button.active{
+ background:linear-gradient(90deg,rgba(168,85,247,.30),rgba(109,61,245,.10))!important;
+ box-shadow:inset 3px 0 #a855f7!important;
+}
+.progress .bar{background:linear-gradient(90deg,#6d3df5,#a855f7)!important}
+#mapCanvas,#mapLive{border-color:#d8c9ef!important}
+</style>
+
+
+<style id="delayed-actions-pop-update">
+#citizenComplaintActions .actions{
+  display:grid!important;
+  grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  gap:12px!important;
+}
+#citizenComplaintActions .actions button{
+  position:relative!important;
+  min-height:58px!important;
+  border-radius:14px!important;
+  font-weight:850!important;
+  border:1.5px solid!important;
+  background:#fff!important;
+  transition:
+    transform .18s ease,
+    box-shadow .18s ease,
+    background-color .18s ease,
+    color .18s ease,
+    border-color .18s ease!important;
+  box-shadow:0 4px 10px rgba(32,25,65,.06)!important;
+}
+#citizenComplaintActions .actions button:nth-child(1){
+  color:#d9364f!important;border-color:#f2b9c2!important;
+}
+#citizenComplaintActions .actions button:nth-child(2){
+  color:#245dcc!important;border-color:#bfd1fa!important;
+}
+#citizenComplaintActions .actions button:nth-child(3){
+  color:#7a3fc2!important;border-color:#d8baf2!important;
+}
+#citizenComplaintActions .actions button:nth-child(4){
+  color:#168653!important;border-color:#b9e3ca!important;
+}
+#citizenComplaintActions .actions button:nth-child(1):hover{
+  background:linear-gradient(135deg,#ff4d67,#e52f4d)!important;
+  color:#fff!important;border-color:#ff4d67!important;
+  transform:translateY(-5px) scale(1.025)!important;
+  box-shadow:0 14px 28px rgba(229,47,77,.30)!important;
+}
+#citizenComplaintActions .actions button:nth-child(2):hover{
+  background:linear-gradient(135deg,#3478ff,#245dcc)!important;
+  color:#fff!important;border-color:#3478ff!important;
+  transform:translateY(-5px) scale(1.025)!important;
+  box-shadow:0 14px 28px rgba(36,93,204,.28)!important;
+}
+#citizenComplaintActions .actions button:nth-child(3):hover{
+  background:linear-gradient(135deg,#a15bea,#7a3fc2)!important;
+  color:#fff!important;border-color:#a15bea!important;
+  transform:translateY(-5px) scale(1.025)!important;
+  box-shadow:0 14px 28px rgba(122,63,194,.28)!important;
+}
+#citizenComplaintActions .actions button:nth-child(4):hover{
+  background:linear-gradient(135deg,#31b66d,#168653)!important;
+  color:#fff!important;border-color:#31b66d!important;
+  transform:translateY(-5px) scale(1.025)!important;
+  box-shadow:0 14px 28px rgba(22,134,83,.28)!important;
+}
+#citizenComplaintActions .actions button:active{
+  transform:translateY(-1px) scale(.985)!important;
+}
+@media(max-width:900px){
+  #citizenComplaintActions .actions{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
+@media(max-width:520px){
+  #citizenComplaintActions .actions{grid-template-columns:1fr!important}
+}
+</style>
+
+
+<style id="login-decoration-update">
+/* CivicAI login-page decoration: visual-only */
+.auth{position:relative;overflow:hidden;background:
+ radial-gradient(circle at 8% 15%,rgba(168,85,247,.16),transparent 25%),
+ radial-gradient(circle at 92% 12%,rgba(79,70,229,.12),transparent 24%),
+ radial-gradient(circle at 50% 100%,rgba(59,130,246,.10),transparent 30%),var(--bg)!important}
+.auth:before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.34;background-image:linear-gradient(rgba(109,61,245,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(109,61,245,.045) 1px,transparent 1px);background-size:42px 42px;mask-image:linear-gradient(to bottom,black,transparent 85%)}
+.auth:after{content:"";position:absolute;width:360px;height:360px;border-radius:50%;right:-120px;bottom:-150px;background:radial-gradient(circle,rgba(168,85,247,.16),transparent 68%);pointer-events:none}
+.auth-card{position:relative;z-index:1;width:min(980px,100%);padding:38px;border-color:rgba(168,85,247,.16);box-shadow:0 28px 80px rgba(70,40,130,.14),0 0 0 1px rgba(255,255,255,.65) inset}
+.auth-card:before{content:"";position:absolute;left:7%;right:7%;top:0;height:3px;border-radius:0 0 8px 8px;background:linear-gradient(90deg,#6d3df5,#a855f7,#4f8df7);opacity:.9}
+.brand-row{gap:13px;margin-bottom:18px;position:relative}
+.logo{width:50px;height:50px;border-radius:15px;font-size:23px;box-shadow:0 9px 20px rgba(109,61,245,.22);flex:none}
+.brand{font-size:30px;letter-spacing:-1px}.brand span{color:#8b45f6!important}
+.brand-tagline{display:block;font-size:10px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:#887aa6;margin-top:2px}
+.login-status{position:absolute;right:0;top:2px;display:flex;align-items:center;gap:7px;padding:7px 10px;border:1px solid #e8e0f6;background:rgba(255,255,255,.78);border-radius:999px;font-size:10px;font-weight:850;color:#65577f;box-shadow:0 5px 15px rgba(70,40,130,.06)}
+.login-status .dot{width:7px;height:7px;border-radius:50%;background:#35b77a;box-shadow:0 0 0 4px rgba(53,183,122,.12);animation:civicPulse 1.8s infinite}
+@keyframes civicPulse{50%{box-shadow:0 0 0 7px rgba(53,183,122,0)}}
+.auth-heading-row{display:flex;justify-content:space-between;align-items:flex-end;gap:16px}
+.ai-badge{display:inline-flex;align-items:center;gap:7px;padding:7px 10px;border-radius:999px;background:#f4edff;border:1px solid #e5d7ff;color:#7040b9;font-size:10px;font-weight:900;white-space:nowrap}
+.ai-badge span{width:6px;height:6px;border-radius:50%;background:#a855f7;box-shadow:0 0 0 4px rgba(168,85,247,.1)}
+.auth h1{letter-spacing:-1.1px}.auth-sub{max-width:690px}
+.roles{gap:15px;margin:22px 0}
+.role-card{position:relative;overflow:hidden;min-height:142px;padding:19px;box-shadow:0 6px 18px rgba(38,42,75,.035)}
+.role-card:after{content:"";position:absolute;width:90px;height:90px;border-radius:50%;right:-42px;top:-45px;background:rgba(168,85,247,.05);transition:.25s}
+.role-card:hover{transform:translateY(-5px)!important;box-shadow:0 14px 28px rgba(109,61,245,.12)!important}
+.role-card:hover:after{transform:scale(1.5);background:rgba(168,85,247,.09)}
+.role-card.active{box-shadow:0 12px 28px rgba(109,61,245,.11)!important}
+.form-grid{gap:14px}.field input{min-height:48px;transition:.2s}.field input:hover{border-color:#cbb8ee}.field input:focus{box-shadow:0 0 0 4px rgba(168,85,247,.10)!important}
+.primary{min-height:48px;padding:12px 20px;border-radius:14px!important}
+.auth-actions{margin-top:18px}
+@media(max-width:760px){.login-status{display:none}.auth-card{padding:28px}.auth-heading-row{display:block}.ai-badge{margin-top:12px}}
+</style>
+
+</head>
+<body>
+
+<div id="auth" class="auth">
+  <div class="auth-card">
+    <div class="brand-row"><div class="logo">C</div><div><div class="brand">Civic<span>AI</span></div><div class="brand-tagline">Smarter Cities. Faster Solutions.</div></div><div class="login-status"><span class="dot"></span> Civic network online</div></div>
+    <div class="auth-heading-row"><h1>Smart Public Issue Resolution</h1>
+    <div><p class="auth-sub">Choose your workspace. Each profile sees only the tools relevant to its role.</p></div><div class="ai-badge"><span></span> AI-powered prioritization</div></div>
+    <div class="roles">
+      <button class="role-card active" data-role="citizen" onclick="selectRole('citizen')"><div class="role-icon">👥</div><div class="role-title">Public / Citizen</div><div class="role-desc">Report issues, track progress, escalate delays and verify fixes.</div></button>
+      <button class="role-card" data-role="worker" onclick="selectRole('worker')"><div class="role-icon">🛠️</div><div class="role-title">Worker</div><div class="role-desc">Manage assigned work, deadlines, evidence and performance.</div></button>
+      <button class="role-card" data-role="authority" onclick="selectRole('authority')"><div class="role-icon">🏛️</div><div class="role-title">Authority</div><div class="role-desc">Prioritize, assign, monitor, review extensions and accountability.</div></button>
+    </div>
+    <div class="form-grid">
+      <div class="field"><label>Email</label><input id="email" placeholder="demo@example.com"></div>
+      <div class="field"><label>Password</label><input id="password" type="password" placeholder="••••••••"></div>
+      <div id="accessWrap" class="field hidden"><label>Profile access key</label><input id="access" placeholder="Required for Worker / Authority"></div>
+      <div id="accessInfo" class="field hidden"><label>Demo keys</label><input value="Worker: WORKER-2026 · Authority: AUTH-2026" disabled></div>
+    </div>
+    <div class="auth-actions"><button class="primary" onclick="login()">Enter Workspace</button></div>
+    <div id="authHint" class="hint"></div>
+  </div>
+</div>
+
+<div id="app" class="app hidden">
+  <aside class="sidebar">
+    <div class="side-brand"><div class="side-logo">C</div><div class="side-name">Civic<span>AI</span></div></div>
+    <div class="side-label">WORKSPACE</div>
+    <div class="nav" id="nav">
+      <button data-page="dashboard" onclick="go('dashboard',this)">⌂ <span>Dashboard</span></button>
+      <button id="navReport" data-page="report" onclick="go('report',this)">＋ <span>Report Issue</span></button>
+      <button data-page="complaints" onclick="go('complaints',this)">▣ <span>Complaints</span></button>
+      <button data-page="map" onclick="go('map',this)">⌖ <span>Live Map</span></button>
+      <button data-page="updates" onclick="go('updates',this)">◉ <span>Updates</span></button>
+      <button id="navIntel" data-page="intelligence" onclick="go('intelligence',this)">✦ <span>Civic Intelligence</span></button>
+      <button id="navTasks" data-page="tasks" onclick="go('tasks',this)">⚒ <span>My Tasks</span></button>
+      <button id="navManage" data-page="manage" onclick="go('manage',this)">▦ <span>Control Center</span></button>
+    </div>
+    <div class="side-label">ACCOUNT</div>
+    <div class="nav"><button onclick="go('settings',this)">⚙ <span>Settings</span></button></div>
+    <div class="profile"><div class="avatar" id="avatar">👥</div><div><div class="profile-name" id="profileName">Citizen</div><div class="profile-role" id="profileRole">Public</div></div></div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div><div class="top-title" id="topTitle">Citizen Workspace</div><div class="crumb" id="crumb">CivicAI / Dashboard</div></div>
+      <div class="top-actions"><input class="search" id="search" placeholder="Search complaints..." oninput="searchTable(this.value)"><button class="icon-btn">🔔</button><button class="logout" onclick="logout()">Logout</button></div>
+    </header>
+
+    <div class="content">
+      <div id="banner" class="role-banner"></div>
+
+      <!-- Dashboard -->
+      <section id="dashboard">
+        <div class="welcome"><div><h1 id="welcome">Welcome back</h1><p id="welcomeSub"></p></div><div class="date">05 September 2026</div></div>
+
+        <div id="citizenDash" class="roleDash">
+          <div class="stats">
+            <div class="stat"><div class="stat-head">MY REPORTS <span>📋</span></div><div class="num">12</div><div class="trend">3 active</div></div>
+            <div class="stat"><div class="stat-head">IN PROGRESS <span>⏳</span></div><div class="num">3</div><div class="trend">Track updates</div></div>
+            <div class="stat"><div class="stat-head">DELAYED <span>⚠️</span></div><div class="num">1</div><div class="trend">Action available</div></div>
+            <div class="stat"><div class="stat-head">RESOLVED <span>✓</span></div><div class="num">7</div><div class="trend">Verification complete</div></div>
+          </div>
+          <div class="grid">
+            <div class="card"><h2>Track Your Reports</h2><p class="muted">Follow an issue from AI analysis to worker progress and final verification.</p>
+              <div class="issue"><div><b>#CIV-1042 — Large pothole</b><div class="muted">Worker A · 65% complete</div></div><span class="badge high">HIGH</span></div>
+              <div class="issue"><div><b>#CIV-1027 — Water leakage</b><div class="muted">Worker D · 3 days overdue</div></div><span class="badge high">DELAYED</span></div>
+              <div class="actions"><button class="primary" onclick="go('complaints')">View Complaints</button><button class="secondary" onclick="go('report')">Report New Issue</button></div>
+            </div>
+            <div class="card"><h2>Nearby Civic Issues</h2><p class="muted">Live map of public issues around the city.</p><div id="mapCanvas"></div><div class="actions"><button class="secondary" onclick="go('map')">Open Full Map</button></div></div>
+          </div>
+          <div class="card" style="margin-top:16px"><h2>Delayed Complaint Center</h2><p class="muted">If work passes its deadline, you can escalate it and report service concerns.</p>
+            <div class="account-grid">
+              <div class="account-box"><b>Complaint</b><span>#CIV-1027</span></div><div class="account-box"><b>Delay</b><span>3 days overdue</span></div><div class="account-box"><b>Worker</b><span>Worker D</span></div><div class="account-box"><b>Escalation</b><span class="badge high">HIGH</span></div>
+            </div>
+            <div class="actions"><button class="primary" onclick="go('complaints')">Open Complaint</button><button class="secondary" onclick="openWorkerComplaint()">Complain About Worker Delay</button></div>
+          </div>
+          <div id="citizenComplaintPanel" class="card hidden" style="margin-top:16px"><h2>Worker Service Complaint</h2><p class="muted">Send a service complaint to the Authority for review.</p>
+            <div class="form-stack"><div class="field"><label>Worker Name</label><input id="workerComplaintName" type="text" value="" placeholder="Enter worker name" autocomplete="off"></div><div class="field"><label>Complaint reason</label><textarea id="workerComplaintText" placeholder="Explain the delay or service problem..."></textarea></div><div class="actions"><button class="primary" onclick="submitWorkerComplaint()">Submit Complaint</button><button class="secondary" onclick="closeWorkerComplaint()">Cancel</button></div><div id="workerComplaintMsg"></div></div>
+          </div>
+        </div>
+
+        <div id="workerDash" class="roleDash hidden">
+          <div class="stats">
+            <div class="stat"><div class="stat-head">ASSIGNED TO ME</div><div class="num">8</div><div class="trend">Active jobs</div></div>
+            <div class="stat"><div class="stat-head">DUE SOON</div><div class="num">2</div><div class="trend">Next 48 hours</div></div>
+            <div class="stat"><div class="stat-head">COMPLETED</div><div class="num">21</div><div class="trend">This month</div></div>
+            <div class="stat"><div class="stat-head">ON-TIME RATE</div><div class="num">82%</div><div class="trend">Needs improvement</div></div>
+          </div>
+          <div class="grid">
+            <div class="card"><h2>Priority Task</h2><div class="issue"><div><b>#CIV-1042 — Large pothole</b><div class="muted">Main Road · deadline 08 Sep 2026</div></div><span class="badge high">HIGH</span></div><div class="progress"><div class="bar" style="width:65%"></div></div><b>65% complete</b><div class="actions"><button class="primary" onclick="go('tasks')">Open My Tasks</button></div></div>
+            <div class="card"><h2>Performance & Accountability</h2><p class="muted">Citizen service complaints are reviewed by Authority.</p><div class="account-grid"><div class="account-box"><b>Citizen complaints</b><span id="workerComplaintCount">0</span></div><div class="account-box"><b>Warning</b><span id="workerWarning">None</span></div><div class="account-box"><b>Black mark</b><span id="workerBlackMark">None</span></div><div class="account-box"><b>Status</b><span>Active</span></div></div></div>
+          </div>
+        </div>
+
+        <div id="authorityDash" class="roleDash hidden">
+          <div class="stats">
+            <div class="stat"><div class="stat-head">OPEN MASTER ISSUES</div><div class="num">18</div><div class="trend">3 high priority</div></div>
+            <div class="stat"><div class="stat-head">HIGH PRIORITY</div><div class="num">6</div><div class="trend">Needs attention</div></div>
+            <div class="stat"><div class="stat-head">EXTENSIONS</div><div class="num">4</div><div class="trend">2 pending approval</div></div>
+            <div class="stat"><div class="stat-head">OVERDUE</div><div class="num">3</div><div class="trend">Escalation queue</div></div>
+          </div>
+          <div class="grid">
+            <div class="card"><h2>AI Priority Queue</h2><p class="muted">Cases ranked by severity, delay and civic impact.</p><div class="issue"><div><b>#CIV-1027 — Water leakage</b><div class="muted">3 days overdue · Worker D</div></div><span class="badge high">URGENT</span></div><div class="issue"><div><b>#CIV-1042 — Large pothole</b><div class="muted">65% complete · deadline 08 Sep</div></div><span class="badge high">HIGH</span></div><div class="actions"><button class="primary" onclick="go('manage')">Open Control Center</button></div></div>
+            <div class="card"><h2>Risk Watch</h2><p class="muted">AI flags issues that could create wider civic impact if delayed.</p><div class="notice"><b>Water leakage → road damage risk</b><br>Repeated reports detected near Lake View. Review assignment and deadline.</div><div class="actions"><button class="secondary" onclick="go('intelligence')">View Civic Intelligence</button></div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Report -->
+      <section id="report" class="hidden">
+        <div class="welcome"><div><h1>Report an Issue</h1><p>Tell CivicAI what is happening. AI will categorize and prioritize the report in this prototype.</p></div></div>
+        <div class="grid">
+          <div class="card"><h2>Issue Details</h2><div class="form-stack">
+            <div class="field"><label>Issue title</label><input id="issueTitle" placeholder="e.g. Large pothole near school"></div>
+            <div class="field"><label>Location</label><input id="issueLocation" placeholder="Street / landmark"></div>
+            <div class="field"><label>Description</label><textarea id="issueDesc" placeholder="Describe the issue..."></textarea></div>
+            <div class="upload"><b>📷 Evidence photo</b><div class="muted" style="margin:5px 0 9px">Optional prototype upload</div><input type="file" accept="image/*"></div>
+            <div class="actions"><button class="primary" onclick="analyzeReport()">Analyze & Create Complaint</button><button class="secondary" onclick="go('dashboard')">Cancel</button></div><div id="reportResult"></div>
+          </div></div>
+          <div class="card"><h2>How CivicAI handles it</h2><div class="timeline"><div class="tl"><span class="tl-dot"></span><div><b>1. AI identification</b><small>Classifies issue and estimates severity.</small></div></div><div class="tl"><span class="tl-dot"></span><div><b>2. Priority</b><small>Serious and time-sensitive cases rise to the top.</small></div></div><div class="tl"><span class="tl-dot"></span><div><b>3. Assignment</b><small>Authority assigns a worker and deadline.</small></div></div><div class="tl"><span class="tl-dot"></span><div><b>4. Verification</b><small>Worker submits evidence; citizen can verify the result.</small></div></div></div></div>
+        </div>
+      </section>
+
+      <!-- Complaints -->
+      <section id="complaints" class="hidden">
+        <div class="welcome"><div><h1>Complaints</h1><p id="complaintsSub">Track public issues and their current status.</p></div></div>
+        <div class="card tablewrap"><table class="table" id="complaintTable"><thead><tr><th>ID</th><th>ISSUE</th><th>LOCATION</th><th>PRIORITY</th><th>WORKER</th><th>DEADLINE</th><th>STATUS</th></tr></thead><tbody>
+        <tr><td>#CIV-1042</td><td>Large pothole</td><td>Main Road</td><td><span class="badge high">HIGH</span></td><td>Worker A</td><td>08 Sep</td><td>In Progress · 65%</td></tr>
+        <tr><td>#CIV-1039</td><td>Broken streetlight</td><td>2nd Street</td><td><span class="badge med">MEDIUM</span></td><td>Worker B</td><td>10 Sep</td><td>Assigned</td></tr>
+        <tr><td>#CIV-1031</td><td>Garbage overflow</td><td>Market Area</td><td><span class="badge low">LOW</span></td><td>Worker C</td><td>03 Sep</td><td>Awaiting verification</td></tr>
+        <tr><td>#CIV-1027</td><td>Water leakage</td><td>Lake View</td><td><span class="badge high">HIGH</span></td><td>Worker D</td><td>06 Sep</td><td><span class="badge high">Delayed / Escalated</span></td></tr>
+        <tr><td>#CIV-1022</td><td>Road damage</td><td>Bus Stand</td><td><span class="badge med">MEDIUM</span></td><td>Worker E</td><td>11 Sep</td><td>In Progress · 40%</td></tr>
+        </tbody></table></div>
+        <div id="citizenComplaintActions" class="card" style="margin-top:16px"><h2>Delayed complaint actions</h2><p class="muted">For overdue work, you can escalate, request an explanation, add evidence or complain about service delay.</p><div class="actions"><button class="primary" onclick="showToast('Complaint escalated to Authority review.')">🚨 Escalate</button><button class="secondary" onclick="showToast('Status explanation requested.')">📝 Request Explanation</button><button class="secondary" onclick="openWorkerComplaint()">👤 Complain About Worker</button><button class="secondary" onclick="showToast('Evidence upload is available in the complaint record.')">📸 Add Evidence</button></div><div id="complaintToast"></div></div>
+      </section>
+
+      <!-- Map -->
+      <section id="map" class="hidden">
+        <div class="welcome"><div><h1>Live Civic Issue Map</h1><p>Location-based view of reported public issues.</p></div></div>
+        <div class="card"><div class="map-tools"><button class="primary" onclick="centerOnUser()">📍 My Location</button><button class="secondary" onclick="resetMap()">↺ Reset City View</button></div><div id="mapLive"></div><div id="mapStatus" class="notice">Map ready. Allow browser location access if you want your position shown.</div></div>
+      </section>
+
+      <!-- Updates -->
+      <section id="updates" class="hidden"><div class="welcome"><div><h1>Updates</h1><p>Recent activity in the CivicAI workflow.</p></div></div><div class="card"><div class="issue"><div><b>🔔 Worker A updated #CIV-1042</b><div class="muted">Work is now 65% complete.</div></div><span class="badge blue">Today</span></div><div class="issue"><div><b>⚠️ #CIV-1027 became overdue</b><div class="muted">Authority escalation recommended.</div></div><span class="badge high">3 days</span></div><div class="issue"><div><b>✓ #CIV-1031 ready for citizen verification</b><div class="muted">Completion evidence submitted.</div></div><span class="badge low">Verify</span></div></div></section>
+
+      <!-- Tasks -->
+      <section id="tasks" class="hidden"><div class="welcome"><div><h1>My Assigned Tasks</h1><p>Only Workers can access this workspace.</p></div></div><div class="grid"><div class="card"><div class="row"><h2>#CIV-1042 — Large pothole</h2><span class="badge high">HIGH</span></div><p class="muted">Main Road · deadline 08 Sep 2026</p><div class="progress"><div id="taskBar" class="bar" style="width:65%"></div></div><b id="taskPct">65% complete</b><div class="actions"><button class="primary" onclick="updateProgress()">Update Progress</button><button class="secondary" onclick="requestExtension()">Request Extension</button></div><div id="taskMsg"></div></div><div class="card"><h2>AI Proof-of-Fix</h2><p class="muted">Upload completion evidence for a prototype verification score.</p><div class="upload"><input id="proof" type="file" accept="image/*"></div><div class="actions"><button class="primary" onclick="runProof()">Run AI Verification</button></div><div id="proofResult"></div></div></div><div class="card" style="margin-top:16px"><h2>Performance</h2><div class="account-grid"><div class="account-box"><b>On-time rate</b><span>82%</span></div><div class="account-box"><b>Citizen complaints</b><span id="taskComplaints">0</span></div><div class="account-box"><b>Warnings</b><span id="taskWarning">0</span></div><div class="account-box"><b>Black mark</b><span id="taskBlack">None</span></div></div></div></section>
+
+      <!-- Intelligence -->
+      <section id="intelligence" class="hidden"><div class="welcome"><div><h1>Civic Intelligence</h1><p>Prototype AI features that go beyond basic complaint reporting.</p></div></div><div class="grid"><div class="card"><h2>🔗 Complaint Fusion</h2><p class="muted">Combines nearby duplicate reports into one master issue.</p><div class="notice"><b>7 nearby reports → 1 master issue</b><br>Reduces duplicate work for Authority.</div><div class="actions"><button class="primary" onclick="showToast('Fusion scan complete: 7 reports grouped into 1 master issue.')">Run Fusion Scan</button></div></div><div class="card"><h2>🔄 Civic Chain Reaction</h2><p class="muted">Connects related problems to reveal wider impact.</p><div class="notice">Blocked drain → Water pooling → Road damage → Traffic risk</div><div class="actions"><button class="primary" onclick="showToast('Chain reaction detected and added to Risk Watch.')">Detect Chain</button></div></div></div><div class="grid" style="margin-top:16px"><div class="card"><h2>🔮 What-If Risk Simulator</h2><p class="muted">Estimate the effect of leaving a high-priority issue unresolved.</p><div class="field"><label>Unresolved for</label><select id="riskDays"><option>1 day</option><option selected>3 days</option><option>7 days</option></select></div><div class="actions"><button class="primary" onclick="simulateRisk()">Simulate</button></div><div id="riskResult"></div></div><div class="card"><h2>📷 AI Proof-of-Fix</h2><p class="muted">A second evidence layer before closure.</p><div class="notice">Prototype confidence score: <b>94%</b></div><div class="actions"><button class="primary" onclick="showToast('Demo comparison complete: 94% confidence.')">Compare Evidence</button></div></div></div></section>
+
+      <!-- Authority -->
+      <section id="manage" class="hidden"><div class="welcome"><div><h1>Authority Control Center</h1><p>Assign work, manage deadlines and review worker accountability.</p></div></div><div class="grid"><div class="card"><h2>Assign Civic Work</h2><div class="form-stack"><div class="field"><label>Issue</label><select><option>#CIV-1027 — Water leakage</option><option>#CIV-1042 — Large pothole</option></select></div><div class="field"><label>Worker</label><select><option>Worker D</option><option>Worker A</option><option>Worker B</option></select></div><div class="field"><label>Deadline</label><input type="date" value="2026-09-08"></div><button class="primary" onclick="showToast('Assignment saved and worker notified.')">Assign Worker</button></div></div><div class="card"><h2>Extension Requests</h2><div class="issue"><div><b>Worker D · #CIV-1027</b><div class="muted">Reason: additional repair work required</div></div><span class="badge warning">PENDING</span></div><div class="actions"><button class="primary" onclick="showToast('Extension approved. New deadline recorded.')">Approve</button><button class="secondary" onclick="showToast('Extension rejected.')">Reject</button></div></div></div>
+        <div class="card" style="margin-top:16px"><h2>⚖️ Worker Accountability Queue</h2><p class="muted">Citizen complaints are reviewed before performance action is recorded.</p><div class="issue"><div><b>#CIV-1027 — Worker D</b><div class="muted">Citizen complaint: 3-day delay · case pending review</div></div><span class="badge high">REVIEW</span></div><div class="actions"><button class="secondary" onclick="issueWarning()">⚠️ Performance Warning</button><button class="secondary" onclick="blackMark()">🚩 Add Black Mark</button><button class="primary" onclick="closeCase()">✓ Close Case</button></div><div id="accountMsg"></div></div>
+      </section>
+
+      <section id="settings" class="hidden"><div class="welcome"><div><h1>Settings</h1><p>Prototype account settings.</p></div></div><div class="card"><h2>Workspace</h2><div class="issue"><div><b>Current profile</b><div class="muted" id="settingsRole">Citizen</div></div><span class="badge blue">ACTIVE</span></div><div class="actions"><button class="secondary" onclick="logout()">Switch Profile</button></div></div></section>
+      <div class="footer-space"></div>
+    </div>
+  </main>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+let selectedRole='citizen', role='', mapMini=null, mapLive=null, userMarker=null, complaintSubmitted=false;
+
+const profiles={
+ citizen:{name:'Citizen',icon:'👥',label:'Public / Citizen',banner:'Citizen workspace — report problems, track progress, escalate delays and verify real-world fixes.'},
+ worker:{name:'Worker',icon:'🛠️',label:'Field Worker',banner:'Worker workspace — handle assigned jobs, deadlines, extensions and completion evidence.'},
+ authority:{name:'Authority',icon:'🏛️',label:'Civic Authority',banner:'Authority workspace — prioritize, assign, approve, verify and review accountability.'}
+};
+
+function selectRole(r){
+ selectedRole=r;
+ document.querySelectorAll('.role-card').forEach(x=>x.classList.toggle('active',x.dataset.role===r));
+ const needs=r!=='citizen';
+ document.getElementById('accessWrap').classList.toggle('hidden',!needs);
+ document.getElementById('accessInfo').classList.toggle('hidden',!needs);
+}
+function login(){
+ const email=document.getElementById('email').value.trim(), pass=document.getElementById('password').value.trim();
+ const hint=document.getElementById('authHint');
+ if(!email||!pass){hint.textContent='Please enter email and password.';return}
+ if(selectedRole==='worker' && document.getElementById('access').value.trim()!=='WORKER-2026'){hint.textContent='Invalid Worker access key.';return}
+ if(selectedRole==='authority' && document.getElementById('access').value.trim()!=='AUTH-2026'){hint.textContent='Invalid Authority access key.';return}
+ role=selectedRole; localStorage.setItem('civicRole',role);
+ document.getElementById('auth').classList.add('hidden');document.getElementById('app').classList.remove('hidden');
+ const p=profiles[role];
+ document.getElementById('avatar').textContent=p.icon;document.getElementById('profileName').textContent=p.name;document.getElementById('profileRole').textContent=p.label;
+ document.getElementById('topTitle').textContent=p.name+' Workspace';document.getElementById('banner').textContent=p.banner;
+ document.getElementById('welcome').textContent='Welcome back, '+email.split('@')[0];
+ document.getElementById('welcomeSub').textContent=p.banner;
+ document.getElementById('settingsRole').textContent=p.label;
+ configureNav();showRoleDashboard();initMiniMap();updateAccountability();
+}
+function configureNav(){
+ document.getElementById('navReport').classList.toggle('hidden',role!=='citizen');
+ document.getElementById('navTasks').classList.toggle('hidden',role!=='worker');
+ document.getElementById('navManage').classList.toggle('hidden',role!=='authority');
+ document.getElementById('navIntel').classList.toggle('hidden',role!=='citizen'&&role!=='authority');
+ document.getElementById('citizenComplaintActions').classList.toggle('hidden',role!=='citizen');
+}
+function showRoleDashboard(){
+ document.querySelectorAll('.roleDash').forEach(x=>x.classList.add('hidden'));
+ document.getElementById(role==='citizen'?'citizenDash':role==='worker'?'workerDash':'authorityDash').classList.remove('hidden');
+ go('dashboard',document.querySelector('[data-page="dashboard"]'),true);
+}
+function go(id,btn,skipRoleCheck=false){
+ const allowed={report:'citizen',tasks:'worker',manage:'authority'};
+ if(!skipRoleCheck && allowed[id] && role!==allowed[id]) return;
+ document.querySelectorAll('.content>section').forEach(s=>s.classList.add('hidden'));
+ const el=document.getElementById(id);if(el)el.classList.remove('hidden');
+ document.querySelectorAll('#nav button').forEach(b=>b.classList.remove('active'));
+ if(btn)btn.classList.add('active');
+ document.getElementById('crumb').textContent='CivicAI / '+(id==='manage'?'Control Center':id==='tasks'?'My Tasks':id[0].toUpperCase()+id.slice(1));
+ if(id==='map'){setTimeout(initLiveMap,100)}
+ if(id==='dashboard'){setTimeout(initMiniMap,100)}
+}
+function logout(){location.reload()}
+
+function initMiniMap(){
+ if(!window.L)return;
+ const el=document.getElementById('mapCanvas'); if(!el)return;
+ if(mapMini){setTimeout(()=>mapMini.invalidateSize(),150);return}
+ mapMini=L.map(el,{zoomControl:true,attributionControl:true}).setView([13.0827,80.2707],12);
+ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(mapMini);
+ addIssueMarkers(mapMini);setTimeout(()=>mapMini.invalidateSize(),300);
+}
+function initLiveMap(){
+ if(!window.L)return;
+ const el=document.getElementById('mapLive');if(!el)return;
+ if(mapLive){setTimeout(()=>mapLive.invalidateSize(true),150);return}
+ mapLive=L.map(el,{zoomControl:true}).setView([13.0827,80.2707],12);
+ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(mapLive);
+ addIssueMarkers(mapLive);setTimeout(()=>mapLive.invalidateSize(true),300);
+}
+function addIssueMarkers(m){
+ const points=[
+  [13.0827,80.2707,'#CIV-1042 — Large pothole','HIGH'],
+  [13.0674,80.2376,'#CIV-1039 — Broken streetlight','MEDIUM'],
+  [13.0475,80.2824,'#CIV-1031 — Garbage overflow','LOW'],
+  [13.1067,80.2446,'#CIV-1027 — Water leakage','HIGH'],
+  [13.0338,80.2622,'#CIV-1022 — Road damage','MEDIUM']
+ ];
+ points.forEach(p=>L.marker([p[0],p[1]]).addTo(m).bindPopup('<b>'+p[2]+'</b><br>Priority: '+p[3]));
+}
+function centerOnUser(){
+ const status=document.getElementById('mapStatus');
+ if(!navigator.geolocation){status.textContent='This browser does not support location.';return}
+ status.textContent='Finding your location…';
+ navigator.geolocation.getCurrentPosition(pos=>{
+   const lat=pos.coords.latitude,lng=pos.coords.longitude;
+   localStorage.setItem('civicLocation',JSON.stringify({lat,lng}));
+   initLiveMap();
+   mapLive.setView([lat,lng],15);
+   if(userMarker)userMarker.remove();
+   userMarker=L.marker([lat,lng]).addTo(mapLive).bindPopup('<b>Your location</b>').openPopup();
+   status.textContent='Your location is marked on the map.';
+ },()=>status.textContent='Location permission was not granted. The city issue map is still available.');
+}
+function resetMap(){if(mapLive){mapLive.setView([13.0827,80.2707],12);setTimeout(()=>mapLive.invalidateSize(true),100)}}
+function openWorkerComplaint(){document.getElementById('citizenComplaintPanel').classList.remove('hidden');document.getElementById('citizenComplaintPanel').scrollIntoView({behavior:'smooth',block:'center'})}
+function closeWorkerComplaint(){document.getElementById('citizenComplaintPanel').classList.add('hidden')}
+function submitWorkerComplaint(){
+ const worker=document.getElementById('workerComplaintName').value.trim();
+ const text=document.getElementById('workerComplaintText').value.trim();
+ if(!worker){document.getElementById('workerComplaintMsg').innerHTML='<div class="notice danger-notice">Please enter the worker name.</div>';return}
+ if(!text){document.getElementById('workerComplaintMsg').innerHTML='<div class="notice danger-notice">Please describe the service problem.</div>';return}
+ complaintSubmitted=true;localStorage.setItem('workerComplaint',text);localStorage.setItem('workerComplaintWorker',worker);
+ document.getElementById('workerComplaintMsg').innerHTML='<div class="notice"><b>Complaint submitted for '+worker+'.</b><br>Authority will review the worker delay before taking performance action.</div>';
+ updateAccountability();
+}
+function updateAccountability(){
+ const has=!!localStorage.getItem('workerComplaint');
+ const warning=localStorage.getItem('workerWarning')==='true';
+ const black=localStorage.getItem('workerBlackMark')==='true';
+ ['workerComplaintCount','taskComplaints'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=has?'1':'0'});
+ const w=document.getElementById('workerWarning');if(w)w.textContent=warning?'Issued':'None';
+ const b=document.getElementById('workerBlackMark');if(b)b.textContent=black?'Recorded':'None';
+ const tw=document.getElementById('taskWarning');if(tw)tw.textContent=warning?'1':'0';
+ const tb=document.getElementById('taskBlack');if(tb)tb.textContent=black?'Recorded':'None';
+}
+function issueWarning(){localStorage.setItem('workerWarning','true');document.getElementById('accountMsg').innerHTML='<div class="notice">Performance warning recorded and worker notified.</div>';updateAccountability()}
+function blackMark(){localStorage.setItem('workerBlackMark','true');document.getElementById('accountMsg').innerHTML='<div class="notice danger-notice"><b>Black mark recorded.</b> This is a performance/accountability record after Authority review.</div>';updateAccountability()}
+function closeCase(){localStorage.removeItem('workerComplaint');document.getElementById('accountMsg').innerHTML='<div class="notice">Accountability case closed.</div>';updateAccountability()}
+function analyzeReport(){
+ const title=document.getElementById('issueTitle').value.trim(),loc=document.getElementById('issueLocation').value.trim();
+ if(!title||!loc){document.getElementById('reportResult').innerHTML='<div class="notice danger-notice">Please enter an issue title and location.</div>';return}
+ const id='#CIV-1043';
+ document.getElementById('reportResult').innerHTML='<div class="notice"><b>AI analysis complete.</b><br>'+id+' created · Category: Road / Public Infrastructure · Priority: HIGH · Confidence: 94%.<br>Authority can now assign a worker and deadline.</div>';
+}
+function updateProgress(){let n=parseInt((document.getElementById('taskPct').textContent.match(/\d+/)||['65'])[0]);n=Math.min(100,n+10);document.getElementById('taskPct').textContent=n+'% complete';document.getElementById('taskBar').style.width=n+'%';document.getElementById('taskMsg').innerHTML='<div class="notice">Progress updated and visible to Authority/Citizen.</div>'}
+function requestExtension(){document.getElementById('taskMsg').innerHTML='<div class="notice">Extension request sent to Authority for approval.</div>'}
+function runProof(){document.getElementById('proofResult').innerHTML='<div class="notice"><b>AI Proof-of-Fix: 94% confidence</b><br>Prototype comparison completed. Authority can review the evidence before closure.</div>'}
+function simulateRisk(){const d=document.getElementById('riskDays').value;document.getElementById('riskResult').innerHTML='<div class="notice"><b>Risk simulation:</b> leaving the issue unresolved for '+d+' increases the likelihood of wider civic impact and repeat complaints.</div>'}
+function searchTable(q){const rows=document.querySelectorAll('#complaintTable tbody tr');rows.forEach(r=>r.style.display=r.innerText.toLowerCase().includes(q.toLowerCase())?'':'none')}
+function showToast(msg){document.getElementById('complaintToast').innerHTML='<div class="notice">'+msg+'</div>'}
+window.addEventListener('resize',()=>{if(mapMini)mapMini.invalidateSize();if(mapLive)mapLive.invalidateSize()});
+</script>
+</body>
+</html>
